@@ -1,16 +1,23 @@
-// Include the libraries we need
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include <TimerOne.h>
+#include <SPI.h>
+#include <TFT.h>
 
 // settings
-// Pins
-#define chargeMosfetGatePin 9
-#define dischargeMosfetGatePin 10
+// Screen pins
+#define CS   7
+#define DC   6
+#define RESET  8
 
-#define batteryInputPin A1
-#define resistorDropPin A0
-#define ONE_WIRE_BUS 2
+// Joystick pins
+#define VRxPin A2
+#define VRyPin A3
+#define SWPin 0
+
+// Charger pins
+#define chargeMosfetGatePin 10
+#define dischargeMosfetGatePin 9
+#define batteryInputPin A5
+#define resistorDropPin A4
 
 #define stop_voltage_lion 2.7
 #define stop_voltage_nimh 0.7
@@ -26,18 +33,11 @@ const float Imax = 2.0f;
 // battery voltage stop
 const float Vbattmax = 4.15f;
 
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-OneWire oneWire(ONE_WIRE_BUS);
-
-// Pass our oneWire reference to Dallas Temperature. 
-DallasTemperature sensors(&oneWire);
-
 // global variables
 long millisSinceLastSummary = 0;
 float setCurrent = 2.0f;
 int dischargePWM = 0;
 int chargePWM = 1023;
-float mAh = 0;
 float stop_voltage = 5;
 int beginMillis = 0;
 
@@ -51,9 +51,14 @@ float resistorDropValue = 0;
 float resistorDrop = 0;
 
 float Isense = 0;
+char Isensechar[11];
 float Vcurr = 0;
+char Vcurrchar[11];
 float Vbatt = 0;
-float tempC = 0;
+char Vbattchar[11];
+float mAh = 0;
+char mAhchar[11];
+
 
 // FSM
 enum state_t {
@@ -63,7 +68,21 @@ enum state_t {
 };
 
 state_t state;
+
+TFT screen = TFT(CS, DC, RESET);
+
 void setup() {
+  // initialize the screen
+  screen.begin();
+  screen.setRotation(2);
+  screen.background(0,0,0);
+  screen.stroke(255,255,255);
+  screen.text("Vbatt: ",    0, 0);
+  screen.text("Vcurr: ",    0, 10);
+  screen.text("Isense: ",   0, 20);  
+  screen.text("capacity: ", 0, 30);
+
+  // initialize charger circuit
   pinMode(dischargeMosfetGatePin, OUTPUT);
   pinMode(chargeMosfetGatePin, OUTPUT);
   Timer1.initialize(32);
@@ -106,8 +125,6 @@ void readSensors() {
   Isense = ((resistorDrop / resistorOhm) * adcVoltPerStep);
   Vcurr = ((batteryValue) * adcVoltPerStep);
   
-  sensors.requestTemperatures(); // Send the command to get temperatures
-  tempC = sensors.getTempCByIndex(0);
 }
 
 void readOpenClampSensor() {
@@ -131,42 +148,46 @@ void readOpenClampSensor() {
 }
 
 void printSummary() {
-  Serial.write("Vbatt: ");
-  Serial.print(Vbatt * 1000);
-  Serial.write("mV - ");
 
-  Serial.write("Vcurr: ");
-  Serial.print(Vcurr * 1000);
-  Serial.write("mV - ");
+  // clear old text
+  screen.stroke(0,0,0);
+  screen.text(Vbattchar,  60, 0);
+  screen.text(Vcurrchar,  60, 10);
+  screen.text(Isensechar, 60, 20);
+  screen.text(mAhchar,    60, 30);
+
+  String VbattS = String(Vbatt * 1000) + "mV";
+  VbattS.toCharArray(Vbattchar, 11);
+  String VcurrS = String(Vcurr * 1000) + "mV";
+  VcurrS.toCharArray(Vcurrchar, 11);
+  String IsenseS = String(Isense * 1000) + "mA";
+  IsenseS.toCharArray(Isensechar, 11);
+  String mAhS = String(mAh) + "mAh";
+  mAhS.toCharArray(mAhchar, 11);
   
-  Serial.write("Isense: ");
-  Serial.print(Isense * 1000);
-  Serial.write("mA - ");
+  // write new text
+  screen.stroke(255,255,255);
+  screen.text(Vbattchar,  60, 0);
+  screen.text(Vcurrchar,  60, 10);
+  screen.text(Isensechar, 60, 20);
+  screen.text(mAhchar,    60, 30);
 
-  Serial.write("CC: ");
-  Serial.print(CCtrip);
+  Serial.write(String("Vbatt: " + VbattS + " - ").c_str());
+  Serial.write(String("Vcurr: " + VcurrS + " - ").c_str());
+  Serial.write(String("Isense: " + IsenseS + " - ").c_str());
+
+  Serial.write(String("CC: " + String(CCtrip, BIN) + " - ").c_str());
   CCtrip = false;
-
-  Serial.write(" - ");
-
-  Serial.write("CV: ");
-  Serial.print(CVtrip);
+  Serial.write(String("CV: " + String(CVtrip, BIN) + " - ").c_str());
   CVtrip = false;
-  
-  Serial.write(" - temp: ");
-  tempC != DEVICE_DISCONNECTED_C ? Serial.print(tempC) : Serial.write ("ERR");
-  
-  Serial.write("c - capacity: ");
-  Serial.print(mAh);
-  Serial.write("mAh");
 
-  Serial.write(" - cpwm: ");
-  Serial.print(chargePWM);
+  Serial.write(String("capacity: " + mAhS + " - ").c_str());
 
-  Serial.write(" - dpwm: ");
-  Serial.print(dischargePWM);
+  Serial.write(String("cpwm: " + String(chargePWM, DEC) + " - ").c_str());
+  Serial.write(String("dpwm: " + String(dischargePWM, DEC) + " - ").c_str());
 
   Serial.write("\n");
+
 }
 
 void readSerial () {
