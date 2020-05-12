@@ -1,12 +1,13 @@
 #include <TimerOne.h>
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
-#include <TFT.h>
 
 // settings
 // Screen pins
-#define CS   7
-#define DC   6
-#define RESET  8
+#define TFT_CS   7
+#define TFT_DC   6
+#define TFT_RST  8
 
 // Joystick pins
 #define VRxPin A2
@@ -69,18 +70,14 @@ enum state_t {
 
 state_t state;
 
-TFT screen = TFT(CS, DC, RESET);
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 void setup() {
   // initialize the screen
-  screen.begin();
-  screen.setRotation(2);
-  screen.background(0,0,0);
-  screen.stroke(255,255,255);
-  screen.text("Vbatt: ",    0, 0);
-  screen.text("Vcurr: ",    0, 10);
-  screen.text("Isense: ",   0, 20);  
-  screen.text("capacity: ", 0, 30);
+  tft.initG();
+  tft.setRotation(1);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
 
   // initialize charger circuit
   pinMode(dischargeMosfetGatePin, OUTPUT);
@@ -149,39 +146,28 @@ void readOpenClampSensor() {
 
 void printSummary() {
 
-  // clear old text
-  screen.stroke(0,0,0);
-  screen.text(Vbattchar,  60, 0);
-  screen.text(Vcurrchar,  60, 10);
-  screen.text(Isensechar, 60, 20);
-  screen.text(mAhchar,    60, 30);
-
-  String VbattS = String(Vbatt * 1000) + "mV";
-  VbattS.toCharArray(Vbattchar, 11);
-  String VcurrS = String(Vcurr * 1000) + "mV";
-  VcurrS.toCharArray(Vcurrchar, 11);
-  String IsenseS = String(Isense * 1000) + "mA";
-  IsenseS.toCharArray(Isensechar, 11);
-  String mAhS = String(mAh) + "mAh";
-  mAhS.toCharArray(mAhchar, 11);
+  String VbattS =  String("Vbatt:    " + String(Vbatt * 1000)) + "mV";
+  String VcurrS =  String("Vcurr:    " + String(Vcurr * 1000)) + "mV";
+  String IsenseS = String("Isense:   " + String(Isense * 1000)) + "mA";
+  String mAhS =    String("capacity: " + String(mAh)) + "mAh";
   
   // write new text
-  screen.stroke(255,255,255);
-  screen.text(Vbattchar,  60, 0);
-  screen.text(Vcurrchar,  60, 10);
-  screen.text(Isensechar, 60, 20);
-  screen.text(mAhchar,    60, 30);
+  tft.setCursor(0,0);
+  tft.println(VbattS);
+  tft.println(VcurrS);
+  tft.println(IsenseS);
+  tft.println(mAhS);
 
-  Serial.write(String("Vbatt: " + VbattS + " - ").c_str());
-  Serial.write(String("Vcurr: " + VcurrS + " - ").c_str());
-  Serial.write(String("Isense: " + IsenseS + " - ").c_str());
+  Serial.write(String(VbattS + " - ").c_str());
+  Serial.write(String(VcurrS + " - ").c_str());
+  Serial.write(String(IsenseS + " - ").c_str());
 
   Serial.write(String("CC: " + String(CCtrip, BIN) + " - ").c_str());
   CCtrip = false;
   Serial.write(String("CV: " + String(CVtrip, BIN) + " - ").c_str());
   CVtrip = false;
 
-  Serial.write(String("capacity: " + mAhS + " - ").c_str());
+  Serial.write(String(mAhS + " - ").c_str());
 
   Serial.write(String("cpwm: " + String(chargePWM, DEC) + " - ").c_str());
   Serial.write(String("dpwm: " + String(dischargePWM, DEC) + " - ").c_str());
