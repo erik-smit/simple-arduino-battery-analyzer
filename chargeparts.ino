@@ -8,7 +8,7 @@ bool chargeTestConstantCurrent() {
 }
 
 bool chargeTestConstantVoltage() {
-  if (chargingVoltage > Vmax) {
+  if (Vcurr > Vmax) {
     CVtrip = true;
     return true;
   } else {
@@ -17,38 +17,32 @@ bool chargeTestConstantVoltage() {
 }
 
 bool chargeTestBatteryFull() {
-  return openClampVoltage > VBATmax;
+  return Vbatt > Vbattmax;
 }
 
 void chargeDecreasePwm() {
-  if (pwmStep > 0) {
-    pwmStep -= 4;
+  if (chargePWM > 0) {
+    chargePWM -= 4;
   }
-  Timer1.setPwmDuty(chargeMosfetGatePin, pwmStep);
+  Timer1.setPwmDuty(chargeMosfetGatePin, chargePWM);
   delay(25);
 }
 
 void chargeIncreasePwm() {
-  if (pwmStep <= 252) {
-    pwmStep += 4;
+  if (chargePWM <= 1020) {
+    chargePWM += 4;
   }
-  Timer1.setPwmDuty(chargeMosfetGatePin, pwmStep);
+  Timer1.setPwmDuty(chargeMosfetGatePin, chargePWM);
   delay(25);
 }
 
 
 void chargeStart() {
-  pwmStep = 0;
+  chargePWM = 1020;
   mAh = 0;
-  Timer1.setPwmDuty(chargeMosfetGatePin, pwmStep);
+  Timer1.setPwmDuty(chargeMosfetGatePin, chargePWM);
   delay(25);
+  String string_charge_start = "Starting charge";
+  Serial.print(string_charge_start + "\n");
   state = CHARGING;
-}
-
-void chargeStop() {
-  pwmStep = 0;
-  CCtrip = 0;
-  CVtrip = 0;
-  fastPWMdac.analogWrite8bit(pwmStep);
-  state = IDLE;
 }
