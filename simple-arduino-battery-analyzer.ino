@@ -45,6 +45,11 @@ int beginMillis = 0;
 bool CCtrip = false;
 bool CVtrip = false;
 
+// buttonvalues
+int VRxValue = 0;
+int VRyValue = 0;
+bool SWValue = 0;
+
 // sensor data
 float batteryValue = 0;
 int openClampBatteryValue = 0;
@@ -60,7 +65,6 @@ char Vbattchar[11];
 float mAh = 0;
 char mAhchar[11];
 
-
 // FSM
 enum state_t {
   IDLE,
@@ -69,6 +73,15 @@ enum state_t {
 };
 
 state_t state;
+
+// FSM
+enum menu_t {
+  MENU_IDLE,
+  MENU_DISCHARGE,
+  MENU_CHARGE
+};
+
+menu_t menu = MENU_IDLE;
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
@@ -121,10 +134,9 @@ void readSensors() {
 //  }
   Isense = ((resistorDrop / resistorOhm) * adcVoltPerStep);
   Vcurr = ((batteryValue) * adcVoltPerStep);
-  
 }
 
-void readOpenClampSensor() {
+void readSensorSummary() {
   if(state == CHARGING) {
     Timer1.setPwmDuty(chargeMosfetGatePin, 1020);
   }
@@ -142,22 +154,29 @@ void readOpenClampSensor() {
   delay(25);
 
   Vbatt = openClampBatteryValue * adcVoltPerStep;
+
+  VRxValue = analogRead(VRxPin);
+  VRyValue = analogRead(VRyPin);
+}
+
+void testVRx() {
+  if (VRxValue < 200) {
+    menu = (int)menu + 1;
+    menu = menu > MENU_CHARGE ? MENU_IDLE : menu;
+  }
+  if (VRxValue > 800) {
+    menu = (int)menu - 1;
+    menu = menu < MENU_IDLE ? MENU_CHARGE : menu;
+  }
 }
 
 void printSummary() {
-
   String VbattS =  String("Vbatt:    " + String(Vbatt * 1000)) + "mV";
   String VcurrS =  String("Vcurr:    " + String(Vcurr * 1000)) + "mV";
   String IsenseS = String("Isense:   " + String(Isense * 1000)) + "mA";
   String mAhS =    String("capacity: " + String(mAh)) + "mAh";
-  
-  // write new text
-  tft.setCursor(0,0);
-  tft.println(VbattS);
-  tft.println(VcurrS);
-  tft.println(IsenseS);
-  tft.println(mAhS);
 
+  // write serial output
   Serial.write(String(VbattS + " - ").c_str());
   Serial.write(String(VcurrS + " - ").c_str());
   Serial.write(String(IsenseS + " - ").c_str());
@@ -174,6 +193,22 @@ void printSummary() {
 
   Serial.write("\n");
 
+  // write tft output
+  tft.setCursor(0,0);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  tft.println(VbattS);
+  tft.println(VcurrS);
+  tft.println(IsenseS);
+  tft.println(mAhS);
+  tft.println();
+
+  // print menu
+  tft.setTextColor(ST77XX_WHITE, menu == MENU_IDLE ? ST77XX_BLUE : ST77XX_BLACK);
+  tft.println("IDLE     ");
+  tft.setTextColor(ST77XX_WHITE, menu == MENU_CHARGE ? ST77XX_BLUE : ST77XX_BLACK);
+  tft.println("CHARGE   ");
+  tft.setTextColor(ST77XX_WHITE, menu == MENU_DISCHARGE ? ST77XX_BLUE : ST77XX_BLACK);
+  tft.println("DISCHARGE");
 }
 
 void readSerial () {
@@ -220,7 +255,8 @@ void loop()
   testBatteryType();
 
   if (millis() - millisSinceLastSummary > 1000) {
-    readOpenClampSensor();
+    readSensorSummary();
+    testVRx();
     printSummary();
 
     if (state == DISCHARGING || state == CHARGING) {
