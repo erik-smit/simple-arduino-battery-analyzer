@@ -198,10 +198,10 @@ void printSummary() {
   String stateS  = String("state:    ");
   switch(state) {
     case IDLE:
-      stateS += String("IDLE");
+      stateS += String("IDLE       ");
       break;
     case CHARGING:
-      stateS += String("CHARGING");
+      stateS += String("CHARGING   ");
       break;
     case DISCHARGING:
       stateS += String("DISCHARGING");
