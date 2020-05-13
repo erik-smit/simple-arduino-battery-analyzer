@@ -191,10 +191,10 @@ void intSWPressed() {
 }
 
 void printSummary() {
-  String VbattS  = String("Vbatt:    " + String(Vbatt * 1000)) + "mV";
-  String VcurrS  = String("Vcurr:    " + String(Vcurr * 1000)) + "mV";
-  String IsenseS = String("Isense:   " + String(Isense * 1000)) + "mA";
-  String mAhS    = String("capacity: " + String(mAh)) + "mAh";
+  String VbattS  = String("Vbatt:    " + String(Vbatt * 1000))  + "mV     ";
+  String VcurrS  = String("Vcurr:    " + String(Vcurr * 1000))  + "mV     ";
+  String IsenseS = String("Isense:   " + String(Isense * 1000)) + "mA     ";
+  String mAhS    = String("capacity: " + String(mAh))           + "mAh    ";
   String stateS  = String("state:    ");
   switch(state) {
     case IDLE:
