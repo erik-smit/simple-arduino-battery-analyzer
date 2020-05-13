@@ -12,7 +12,7 @@
 // Joystick pins
 #define VRxPin A2
 #define VRyPin A3
-#define SWPin 0
+#define SWPin 2
 
 // Charger pins
 #define chargeMosfetGatePin 10
@@ -48,7 +48,7 @@ bool CVtrip = false;
 // buttonvalues
 int VRxValue = 0;
 int VRyValue = 0;
-bool SWValue = 0;
+volatile int SWValue = 0;
 
 // sensor data
 float batteryValue = 0;
@@ -99,6 +99,12 @@ void setup() {
   Timer1.pwm(dischargeMosfetGatePin, 0);
   Timer1.pwm(chargeMosfetGatePin, 1020);
   pinMode(batteryInputPin, INPUT);
+
+  // init switch button
+  pinMode(SWPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(SWPin), intSWPressed, FALLING);
+ 
+  // other init
   Serial.begin(115200);
   everythingStop();
 }
@@ -170,11 +176,37 @@ void testVRx() {
   }
 }
 
+void intSWPressed() {
+  switch(menu) {
+    case MENU_IDLE:
+      everythingStop();
+      break;
+    case MENU_CHARGE:
+      chargeStart();
+      break;
+    case MENU_DISCHARGE:
+      dischargeStart();
+      break;
+  }
+}
+
 void printSummary() {
-  String VbattS =  String("Vbatt:    " + String(Vbatt * 1000)) + "mV";
-  String VcurrS =  String("Vcurr:    " + String(Vcurr * 1000)) + "mV";
+  String VbattS  = String("Vbatt:    " + String(Vbatt * 1000)) + "mV";
+  String VcurrS  = String("Vcurr:    " + String(Vcurr * 1000)) + "mV";
   String IsenseS = String("Isense:   " + String(Isense * 1000)) + "mA";
-  String mAhS =    String("capacity: " + String(mAh)) + "mAh";
+  String mAhS    = String("capacity: " + String(mAh)) + "mAh";
+  String stateS  = String("state:    ");
+  switch(state) {
+    case IDLE:
+      stateS += String("IDLE");
+      break;
+    case CHARGING:
+      stateS += String("CHARGING");
+      break;
+    case DISCHARGING:
+      stateS += String("DISCHARGING");
+      break;
+  }
 
   // write serial output
   Serial.write(String(VbattS + " - ").c_str());
@@ -200,9 +232,10 @@ void printSummary() {
   tft.println(VcurrS);
   tft.println(IsenseS);
   tft.println(mAhS);
-  tft.println();
-
+  tft.println(stateS);
+  
   // print menu
+  tft.println();
   tft.setTextColor(ST77XX_WHITE, menu == MENU_IDLE ? ST77XX_BLUE : ST77XX_BLACK);
   tft.println("IDLE     ");
   tft.setTextColor(ST77XX_WHITE, menu == MENU_CHARGE ? ST77XX_BLUE : ST77XX_BLACK);
